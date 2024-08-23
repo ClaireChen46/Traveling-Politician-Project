@@ -1,0 +1,156 @@
+import numpy as np
+import random
+from sklearn.cluster import KMeans
+
+# Set the random seed for reproducibility
+seed = 42
+np.random.seed(seed)
+random.seed(seed)
+
+# Haversine formula to calculate distance between two points
+def haversine(coord1, coord2):
+    R = 6371  # Earth radius in kilometers
+    lat1, lon1 = np.radians(coord1[0]), np.radians(coord1[1])
+    lat2, lon2 = np.radians(coord2[0]), np.radians(coord2[1])
+    dlat = lat2 - lat1
+    dlon = dlon = lon2 - lon1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+    return R * c
+
+# Nearest Neighbor Algorithm for solving TSP within a cluster
+def nearest_neighbor_tsp(cluster_points):
+    start = cluster_points[0]
+    unvisited = cluster_points[1:]
+    tour = [start]
+
+    while unvisited:
+        nearest = min(unvisited, key=lambda x: haversine(tour[-1][1], x[1]))
+        tour.append(nearest)
+        unvisited.remove(nearest)
+
+    return tour
+
+# 2-opt Optimization Algorithm
+def two_opt(route, state_capitals):
+    best = route
+    improved = True
+    while improved:
+        improved = False
+        for i in range(1, len(route) - 2):
+            for j in range(i + 1, len(route)):
+                if j - i == 1: continue
+                new_route = route[:]
+                new_route[i:j] = route[j - 1:i - 1:-1]
+                if route_distance(new_route, state_capitals) < route_distance(best, state_capitals):
+                    best = new_route
+                    improved = True
+        route = best
+    return best
+
+def route_distance(route, state_capitals):
+    return sum(haversine(state_capitals[route[i]], state_capitals[route[i + 1]]) for i in range(len(route) - 1))
+
+# State capitals (complete list)
+state_capitals = {
+    'Alabama (Montgomery)': (32.377716, -86.300568),
+    'Alaska (Juneau)': (58.301598, -134.420212),
+    'Arizona (Phoenix)': (33.448143, -112.096962),
+    'Arkansas (Little Rock)': (34.746613, -92.288986),
+    'California (Sacramento)': (38.576668, -121.493629),
+    'Colorado (Denver)': (39.739227, -104.990250),
+    'Connecticut (Hartford)': (41.7658, -72.6734),
+    'Delaware (Dover)': (39.158168, -75.524368),
+    'Florida (Tallahassee)': (30.438118, -84.281296),
+    'Georgia (Atlanta)': (33.749027, -84.388229),
+    'Hawaii (Honolulu)': (21.307442, -157.857376),
+    'Idaho (Boise)': (43.617775, -116.199722),
+    'Illinois (Springfield)': (39.798363, -89.654961),
+    'Indiana (Indianapolis)': (39.768623, -86.162643),
+    'Iowa (Des Moines)': (41.590939, -93.620866),
+    'Kansas (Topeka)': (39.048191, -95.677956),
+    'Kentucky (Frankfort)': (38.186722, -84.875374),
+    'Louisiana (Baton Rouge)': (30.457069, -91.187393),
+    'Maine (Augusta)': (44.307167, -69.781693),
+    'Maryland (Annapolis)': (38.978764, -76.490936),
+    'Massachusetts (Boston)': (42.358162, -71.063698),
+    'Michigan (Lansing)': (42.733635, -84.555328),
+    'Minnesota (Saint Paul)': (44.955097, -93.102211),
+    'Mississippi (Jackson)': (32.298690, -90.184776),
+    'Missouri (Jefferson City)': (38.579201, -92.172935),
+    'Montana (Helena)': (46.585709, -112.018417),
+    'Nebraska (Lincoln)': (40.808075, -96.699654),
+    'Nevada (Carson City)': (39.163914, -119.766121),
+    'New Hampshire (Concord)': (43.206898, -71.537994),
+    'New Jersey (Trenton)': (40.220596, -74.769913),
+    'New Mexico (Santa Fe)': (35.68224, -105.939728),
+    'New York (Albany)': (42.652843, -73.757874),
+    'North Carolina (Raleigh)': (35.78043, -78.639099),
+    'North Dakota (Bismarck)': (46.82085, -100.783318),
+    'Ohio (Columbus)': (39.961346, -82.999069),
+    'Oklahoma (Oklahoma City)': (35.492207, -97.503342),
+    'Oregon (Salem)': (44.938461, -123.030403),
+    'Pennsylvania (Harrisburg)': (40.264378, -76.883598),
+    'Rhode Island (Providence)': (41.830914, -71.414963),
+    'South Carolina (Columbia)': (34.000343, -81.033211),
+    'South Dakota (Pierre)': (44.367031, -100.346405),
+    'Tennessee (Nashville)': (36.16581, -86.784241),
+    'Texas (Austin)': (30.27467, -97.740349),
+    'Utah (Salt Lake City)': (40.777477, -111.888237),
+    'Vermont (Montpelier)': (44.262436, -72.580536),
+    'Virginia (Richmond)': (37.538857, -77.43364),
+    'Washington (Olympia)': (47.035805, -122.905014),
+    'West Virginia (Charleston)': (38.336246, -81.612328),
+    'Wisconsin (Madison)': (43.074684, -89.384445),
+    'Wyoming (Cheyenne)': (41.140259, -104.820236),
+    'Washington, DC': (38.89511, -77.03637)
+}
+
+# Convert city coordinates to an array for K-means (excluding Iowa and DC initially)
+city_names = [city for city in state_capitals.keys() if city not in ['Iowa (Des Moines)', 'Washington, DC']]
+coords = np.array([state_capitals[city] for city in city_names])
+
+# Apply K-means clustering
+kmeans = KMeans(n_clusters=14, random_state=seed).fit(coords)
+labels = kmeans.labels_
+
+# Group cities by clusters
+clusters = {}
+for label in np.unique(labels):
+    clusters[label] = [city_names[i] for i in range(len(labels)) if labels[i] == label]
+
+# Solve TSP within each cluster
+tours = {}
+for cluster_id, cities in clusters.items():
+    cluster_coords = [(city, state_capitals[city]) for city in cities]
+    tour = nearest_neighbor_tsp(cluster_coords)
+    tours[cluster_id] = [city[0] for city in tour]  # Ensure it's a list of city names
+
+# Example of connecting clusters with Iowa as the start and DC as the end
+def connect_clusters(tours):
+    all_tours = [('Iowa (Des Moines)', state_capitals['Iowa (Des Moines)'])]
+    cluster_order = list(tours.keys())
+
+    for i in range(len(cluster_order)):
+        tour = tours[cluster_order[i]]
+        all_tours.extend([(city, state_capitals[city]) for city in tour])
+
+    all_tours.append(('Washington, DC', state_capitals['Washington, DC']))  # End at Washington, DC
+    return all_tours
+
+# Final path connecting all clusters
+final_tour = connect_clusters(tours)
+
+# Convert coordinates back to city names for display
+final_tour_names = [tour[0] for tour in final_tour]
+
+# Apply 2-opt optimization
+final_tour_names = two_opt(final_tour_names, state_capitals)
+
+# Calculate total distance
+total_distance = 0
+for i in range(len(final_tour_names) - 1):
+    total_distance += haversine(state_capitals[final_tour_names[i]], state_capitals[final_tour_names[i + 1]])
+
+print("Final optimized route:", " -> ".join(final_tour_names))
+print("Total distance after 2-opt optimization:", total_distance, "km")
