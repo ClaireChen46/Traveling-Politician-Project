@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project implements a route optimization algorithm that calculates the most efficient route to visit all U.S. state capitals. The project leverages K-means clustering, the nearest neighbor algorithm, and the 2-opt optimization technique to minimize travel distance.
+This project implements a route optimization algorithm designed to calculate the most efficient route for a politician to travel to every U.S. state capital once, starting in Iowa and ending in Washington, DC. The objective is to minimize travel distance by leveraging advanced techniques such as K-means clustering, the nearest neighbor algorithm, and the 2-opt optimization technique.
 
 ## Features
 
